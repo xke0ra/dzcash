@@ -1,0 +1,244 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "linux-musl-openssl-3.0.x"]
+}
+
+enum UserStatus {
+  ACTIVE
+  SUSPENDED
+  FROZEN
+}
+
+enum UserRole {
+  USER
+  ADMIN
+  SUPER_ADMIN
+}
+
+enum OfferProvider {
+  CPX
+  OFFERTORO
+  GENERIC
+}
+
+enum ClickStatus {
+  CLICKED
+  CONVERTED
+  REJECTED
+}
+
+enum TransactionType {
+  OFFER_CONVERSION
+  WITHDRAWAL
+  REFERRAL_BONUS
+  FRAUD_REVERSAL
+}
+
+enum TransactionStatus {
+  PENDING
+  COMPLETED
+  REVERSED
+  REJECTED
+}
+
+enum WithdrawalMethod {
+  PAYPAL
+  CRYPTO
+  GIFT_CARD
+}
+
+enum WithdrawalStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  FAILED
+}
+
+enum FraudTriggerType {
+  VPN_DETECTED
+  IP_MISMATCH
+  HIGH_VELOCITY
+  DEVICE_FINGERPRINT_CLONE
+  GEO_INCONSISTENCY
+}
+
+model User {
+  id               String         @id @default(uuid())
+  email            String         @unique
+  passwordHash     String
+  referralCode     String         @unique
+  referredById     String?
+  referredBy       User?          @relation("UserReferrals", fields: [referredById], references: [id])
+  referrals        User[]         @relation("UserReferrals")
+  status           UserStatus     @default(ACTIVE)
+  role             UserRole       @default(USER)
+  riskScore        Float          @default(0.0)
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+  
+  emailVerified    Boolean          @default(false)
+  notifications    Notification[]
+  wallet           Wallet?
+  sessions         Session[]
+  clicks           Click[]
+  transactions     Transaction[]
+  withdrawals      Withdrawal[]
+  fraudLogs        FraudLog[]
+  auditLogs        AuditLog[]     @relation("AuditLogUser")
+
+  @@index([status])
+  @@index([role])
+  @@index([riskScore])
+  @@index([createdAt])
+}
+
+model Session {
+  id           String   @id @default(uuid())
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  refreshToken String   @unique
+  expiresAt    DateTime
+  ipAddress    String?
+  userAgent    String?
+  createdAt    DateTime @default(now())
+}
+
+model Wallet {
+  id               String   @id @default(uuid())
+  userId           String   @unique
+  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  pendingBalance   Decimal  @default(0.00) @db.Decimal(12, 4)
+  availableBalance Decimal  @default(0.00) @db.Decimal(12, 4)
+  updatedAt        DateTime @updatedAt
+}
+
+model Offer {
+  id            String        @id @default(uuid())
+  provider      OfferProvider
+  providerId    String        // Remote offer ID inside the network
+  name          String
+  description   String
+  payoutAmount  Decimal       @db.Decimal(10, 4) // What the advertiser pays us
+  rewardAmount  Decimal       @db.Decimal(10, 4) // What we pay the user
+  status        Boolean       @default(true)
+  targetUrl     String        // URL containing macro placeholders
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+  clicks        Click[]
+
+  @@unique([provider, providerId])
+}
+
+model Click {
+  id                String       @id @default(uuid()) // Unique click_id
+  userId            String
+  user              User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  offerId           String
+  offer             Offer        @relation(fields: [offerId], references: [id])
+  ip                String
+  userAgent         String
+  country           String?
+  deviceFingerprint String?
+  status            ClickStatus  @default(CLICKED)
+  createdAt         DateTime     @default(now())
+  transaction       Transaction?
+}
+
+model Transaction {
+  id           String            @id @default(uuid())
+  userId       String
+  user         User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type         TransactionType
+  amount       Decimal           @db.Decimal(12, 4)
+  status       TransactionStatus @default(PENDING)
+  clickId      String?           @unique
+  click        Click?            @relation(fields: [clickId], references: [id])
+  withdrawalId String?           @unique
+  withdrawal   Withdrawal?       @relation(fields: [withdrawalId], references: [id])
+  notes        String?
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
+}
+
+model Withdrawal {
+  id           String           @id @default(uuid())
+  userId       String
+  user             User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  method       WithdrawalMethod
+  status       WithdrawalStatus @default(PENDING)
+  amount       Decimal          @db.Decimal(12, 4)
+  details      Json             // E.g. email for Paypal, wallet address for crypto
+  processedAt  DateTime?
+  createdAt    DateTime         @default(now())
+  transaction  Transaction?
+}
+
+model FraudLog {
+  id          String           @id @default(uuid())
+  userId      String
+  user             User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  clickId     String?
+  triggerType FraudTriggerType
+  score       Float
+  details     Json
+  createdAt   DateTime         @default(now())
+
+  @@index([userId, createdAt])
+  @@index([triggerType])
+}
+
+enum NotificationType {
+  OFFER_COMPLETED
+  WITHDRAWAL_STATUS
+  FRAUD_ALERT
+  REFERRAL_BONUS
+  ACCOUNT_STATUS
+  SYSTEM
+}
+
+enum NotificationChannel {
+  IN_APP
+  EMAIL
+  BOTH
+}
+
+model Notification {
+  id        String             @id @default(uuid())
+  userId    String
+  user      User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      NotificationType
+  channel   NotificationChannel @default(BOTH)
+  title     String
+  body      String
+  data      Json?              // Additional payload
+  read      Boolean            @default(false)
+  emailed   Boolean            @default(false)
+  createdAt DateTime           @default(now())
+
+  @@index([userId, read])
+  @@index([userId, createdAt])
+  @@index([type])
+}
+
+model AuditLog {
+  id          String   @id @default(uuid())
+  userId      String
+  user        User     @relation("AuditLogUser", fields: [userId], references: [id], onDelete: Cascade)
+  action      String   // e.g., 'USER_STATUS_CHANGED', 'WITHDRAWAL_APPROVED'
+  entityType  String   // e.g., 'User', 'Withdrawal', 'Offer'
+  entityId    String?
+  oldValue    String?
+  newValue    String?
+  ipAddress   String?
+  metadata    Json?
+  createdAt   DateTime @default(now())
+
+  @@index([userId])
+  @@index([entityType, entityId])
+  @@index([createdAt])
+}

@@ -1,0 +1,141 @@
+{
+  "__inputs": [],
+  "__requires": [],
+  "schemaVersion": 39,
+  "title": "DZCASH Platform Dashboard",
+  "uid": "dzcash-platform",
+  "version": 1,
+  "timezone": "browser",
+  "editable": true,
+  "refresh": "30s",
+  "panels": [
+    {
+      "title": "HTTP Requests Rate",
+      "type": "graph",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+      "targets": [{
+        "expr": "rate(dzcash_http_requests_total[5m])",
+        "legendFormat": "{{route}} - {{method}}"
+      }]
+    },
+    {
+      "title": "HTTP Request Duration (p95)",
+      "type": "heatmap",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+      "targets": [{
+        "expr": "dzcash_http_request_duration_ms",
+        "legendFormat": "{{route}}"
+      }]
+    },
+    {
+      "title": "Active Users",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 4, "x": 0, "y": 8 },
+      "targets": [{
+        "expr": "dzcash_active_users"
+      }],
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": { "steps": [{ "color": "green" }, { "value": 100, "color": "yellow" }, { "value": 500, "color": "red" }] }
+        }
+      }
+    },
+    {
+      "title": "Total Users",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 4, "x": 4, "y": 8 },
+      "targets": [{
+        "expr": "dzcash_total_users"
+      }]
+    },
+    {
+      "title": "Total Earned (USD)",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 4, "x": 8, "y": 8 },
+      "targets": [{
+        "expr": "dzcash_total_earned_usd"
+      }],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "currencyUSD",
+          "decimals": 2
+        }
+      }
+    },
+    {
+      "title": "Total Withdrawn (USD)",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 4, "x": 12, "y": 8 },
+      "targets": [{
+        "expr": "dzcash_total_withdrawn_usd"
+      }],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "currencyUSD",
+          "decimals": 2
+        }
+      }
+    },
+    {
+      "title": "Pending Withdrawals",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 4, "x": 16, "y": 8 },
+      "targets": [{
+        "expr": "dzcash_pending_withdrawals"
+      }]
+    },
+    {
+      "title": "Fraud Alerts Rate",
+      "type": "graph",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 12 },
+      "targets": [{
+        "expr": "rate(dzcash_fraud_alerts_total[5m])",
+        "legendFormat": "{{trigger_type}}"
+      }]
+    },
+    {
+      "title": "Notifications Sent",
+      "type": "graph",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 12 },
+      "targets": [{
+        "expr": "rate(dzcash_notifications_sent_total[5m])",
+        "legendFormat": "{{type}}"
+      }]
+    },
+    {
+      "title": "Database Query Duration (p99)",
+      "type": "graph",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 20 },
+      "targets": [{
+        "expr": "histogram_quantile(0.99, rate(dzcash_db_query_duration_ms_bucket[5m]))",
+        "legendFormat": "{{operation}}"
+      }]
+    },
+    {
+      "title": "Node CPU Usage",
+      "type": "gauge",
+      "gridPos": { "h": 4, "w": 4, "x": 12, "y": 20 },
+      "targets": [{
+        "expr": "rate(process_cpu_seconds_total{job='dzcash-backend'}[1m]) * 100"
+      }]
+    },
+    {
+      "title": "Node Memory Usage",
+      "type": "gauge",
+      "gridPos": { "h": 4, "w": 4, "x": 16, "y": 20 },
+      "targets": [{
+        "expr": "nodejs_heap_size_used_bytes{job='dzcash-backend'} / nodejs_heap_size_total_bytes{job='dzcash-backend'} * 100"
+      }]
+    },
+    {
+      "title": "HTTP Status Codes (4xx/5xx)",
+      "type": "graph",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 24 },
+      "targets": [
+        { "expr": "rate(dzcash_http_requests_total{status_code=~'4..'}[5m])", "legendFormat": "4xx" },
+        { "expr": "rate(dzcash_http_requests_total{status_code=~'5..'}[5m])", "legendFormat": "5xx" }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,11 @@
+apiVersion: 1
+
+providers:
+  - name: 'DZCASH Dashboards'
+    orgId: 1
+    folder: 'DZCASH'
+    type: file
+    disableDeletion: true
+    editable: true
+    options:
+      path: /etc/grafana/dashboards
