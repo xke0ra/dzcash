@@ -1,13 +1,32 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { EmailService } from '../email/email.service';
+import { PushService } from './push.service';
 import { NotificationType, NotificationChannel } from '@prisma/client';
+import { Subject } from 'rxjs';
+
+export interface NotificationEvent {
+  userId: string;
+  notification: {
+    id: string;
+    type: string;
+    title: string;
+    body: string;
+    data: any;
+    read: boolean;
+    createdAt: Date;
+  };
+}
 
 @Injectable()
 export class NotificationService {
+  private readonly logger = new Logger(NotificationService.name);
+  public readonly notification$ = new Subject<NotificationEvent>();
+
   constructor(
     private prisma: PrismaService,
     private email: EmailService,
+    private pushService: PushService,
   ) {}
 
   async create(data: {
@@ -29,8 +48,28 @@ export class NotificationService {
       },
     });
 
+    // Emit SSE event for real-time delivery
+    this.notification$.next({
+      userId: data.userId,
+      notification: {
+        id: notification.id,
+        type: notification.type,
+        title: notification.title,
+        body: notification.body,
+        data: notification.data,
+        read: notification.read,
+        createdAt: notification.createdAt,
+      },
+    });
+
+    // Send email if not IN_APP only
     if (data.channel !== 'IN_APP') {
       this.sendEmail(data.userId, data.type, data.title, data.body).catch(() => {});
+    }
+
+    // Send push notification if channel is BOTH or EMAIL
+    if (data.channel !== 'IN_APP') {
+      this.pushService.sendToUser(data.userId, { title: data.title, body: data.body, data: data.data }).catch(() => {});
     }
 
     return notification;
@@ -171,7 +210,6 @@ export class NotificationService {
   private async sendEmail(userId: string, type: NotificationType, title: string, body: string) {
     const user = await this.prisma.user.findUnique({ where: { id: userId } });
     if (!user?.email) return;
-    // Simple email notification
     await this.email.sendMail({
       to: user.email,
       subject: `[DZCASH] ${title}`,

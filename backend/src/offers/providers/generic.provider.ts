@@ -1,41 +1,30 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
+import { BaseProvider, SyncOffer } from './base-provider';
 import { OfferProviderInterface, PostbackData } from './offer-provider.interface';
 
 @Injectable()
-export class GenericProvider implements OfferProviderInterface {
-  private readonly logger = new Logger(GenericProvider.name);
-  private readonly secretToken = process.env.GENERIC_PROVIDER_TOKEN || 'generic_token_xyz_987';
+export class GenericProvider extends BaseProvider implements OfferProviderInterface {
+  protected readonly providerName = 'Generic';
+  protected readonly baseUrl = 'https://generic-offers.com';
+  private readonly token = process.env.GENERIC_TOKEN || 'generic-dev-token';
 
   getProviderName(): string {
-    return 'GENERIC';
+    return this.providerName;
   }
 
-  async validatePostback(
-    query: Record<string, any>,
-    headers: Record<string, any>,
-    body: Record<string, any>,
-  ): Promise<boolean> {
-    const { click_id, payout, token } = query;
-
-    if (!click_id || !payout || !token) {
-      this.logger.error('Generic Postback missing required fields');
-      return false;
-    }
-
-    const isValid = token === this.secretToken;
-
-    if (!isValid) {
-      this.logger.warn(`Generic Postback token invalid. Expected: ${this.secretToken}, Received: ${token}`);
-    }
-
-    return isValid;
+  async validatePostback(query: Record<string, any>, _headers: Record<string, any>, _body: Record<string, any>): Promise<boolean> {
+    return query.token === this.token;
   }
 
-  extractPostbackData(query: Record<string, any>, body: Record<string, any>): PostbackData {
+  extractPostbackData(query: Record<string, any>, _body: Record<string, any>): PostbackData {
     return {
       clickId: query.click_id,
-      payout: parseFloat(query.payout),
-      externalStatus: query.status || 'success',
+      payout: parseFloat(query.payout || '0'),
+      externalStatus: query.status || 'converted',
     };
+  }
+
+  async syncOffers(): Promise<SyncOffer[]> {
+    return this.generateMockOffers(5);
   }
 }

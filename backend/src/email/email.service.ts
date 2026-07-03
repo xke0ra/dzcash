@@ -1,27 +1,22 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import * as path from 'path';
+import * as fs from 'fs';
 
 export interface EmailOptions {
   to: string;
   subject: string;
   html: string;
-  text?: string;
-}
-
-export interface EmailTemplate {
-  subject: string;
-  html: (vars: Record<string, string>) => string;
 }
 
 @Injectable()
 export class EmailService {
   private transporter: any;
+  private handlebars: any;
+  private layoutTemplate: HandlebarsTemplate | null = null;
+  private templatesCache = new Map<string, HandlebarsTemplate>();
 
-  constructor(private config: ConfigService) {
-    if (this.isConfigured()) {
-      // Lazy-init nodemailer when available
-    }
-  }
+  constructor(private config: ConfigService) {}
 
   isConfigured(): boolean {
     return !!(
@@ -30,6 +25,39 @@ export class EmailService {
       this.config.get('SMTP_USER') &&
       this.config.get('SMTP_PASS')
     );
+  }
+
+  private async getHandlebars(): Promise<any> {
+    if (!this.handlebars) {
+      this.handlebars = await import('handlebars');
+      this.handlebars.registerHelper('json', (ctx: any) => JSON.stringify(ctx));
+    }
+    return this.handlebars;
+  }
+
+  private async loadTemplate(name: string): Promise<HandlebarsTemplate> {
+    const cached = this.templatesCache.get(name);
+    if (cached) return cached;
+
+    const hbs = await this.getHandlebars();
+    const filePath = path.join(__dirname, 'templates', `${name}.hbs`);
+    const source = fs.readFileSync(filePath, 'utf-8');
+    const template = hbs.compile(source);
+    this.templatesCache.set(name, template);
+    return template;
+  }
+
+  private async render(name: string, vars: Record<string, any>): Promise<string> {
+    const hbs = await this.getHandlebars();
+    if (!this.layoutTemplate) {
+      const layoutPath = path.join(__dirname, 'templates', 'layout.hbs');
+      const layoutSource = fs.readFileSync(layoutPath, 'utf-8');
+      this.layoutTemplate = hbs.compile(layoutSource);
+    }
+
+    const body = await this.loadTemplate(name);
+    const bodyHtml = body({ ...vars, year: new Date().getFullYear() });
+    return this.layoutTemplate!({ body: bodyHtml, year: new Date().getFullYear() });
   }
 
   private async getTransporter() {
@@ -66,110 +94,34 @@ export class EmailService {
   }
 
   sendVerificationEmail(to: string, code: string) {
-    return this.sendMail({
-      to,
-      subject: 'Verify your email - DZCASH',
-      html: this.templates.verification({ code }),
-    });
+    return this.render('verification', { code }).then((html) =>
+      this.sendMail({ to, subject: 'Verify your email - DZCASH', html }),
+    );
   }
 
   sendWithdrawalApproved(to: string, amount: string, method: string) {
-    return this.sendMail({
-      to,
-      subject: 'Withdrawal Approved - DZCASH',
-      html: this.templates.withdrawalApproved({ amount, method }),
-    });
+    return this.render('withdrawal-approved', { amount, method }).then((html) =>
+      this.sendMail({ to, subject: 'Withdrawal Approved - DZCASH', html }),
+    );
   }
 
   sendWithdrawalRejected(to: string, amount: string, reason: string) {
-    return this.sendMail({
-      to,
-      subject: 'Withdrawal Rejected - DZCASH',
-      html: this.templates.withdrawalRejected({ amount, reason }),
-    });
+    return this.render('withdrawal-rejected', { amount, reason }).then((html) =>
+      this.sendMail({ to, subject: 'Withdrawal Rejected - DZCASH', html }),
+    );
   }
 
   sendFraudAlert(to: string, trigger: string) {
-    return this.sendMail({
-      to,
-      subject: 'Security Alert - DZCASH',
-      html: this.templates.fraudAlert({ trigger }),
-    });
+    return this.render('fraud-alert', { trigger }).then((html) =>
+      this.sendMail({ to, subject: 'Security Alert - DZCASH', html }),
+    );
   }
 
   sendWelcome(to: string) {
-    return this.sendMail({
-      to,
-      subject: 'Welcome to DZCASH!',
-      html: this.templates.welcome({}),
-    });
+    return this.render('welcome', {}).then((html) =>
+      this.sendMail({ to, subject: 'Welcome to DZCASH!', html }),
+    );
   }
-
-  private templates: Record<string, EmailTemplate> = {
-    verification: {
-      subject: 'Verify your email - DZCASH',
-      html: ({ code }) => `
-        <div style="font-family:sans-serif;max-width:480px;margin:0 auto;background:#0f172a;color:#f8fafc;padding:32px;border-radius:16px;border:1px solid #1e293b;">
-          <div style="text-align:center;font-size:24px;font-weight:800;color:#38bdf8;margin-bottom:24px;">DZCASH</div>
-          <h2 style="font-size:18px;margin:0 0 12px;">Verify Your Email</h2>
-          <p style="font-size:14px;color:#94a3b8;margin:0 0 20px;">Use the code below to verify your email address:</p>
-          <div style="text-align:center;font-size:32px;font-weight:800;color:#38bdf8;letter-spacing:8px;background:#1e293b;padding:16px;border-radius:12px;margin:0 0 20px;">${code}</div>
-          <p style="font-size:12px;color:#64748b;">This code expires in 1 hour.</p>
-        </div>`,
-    },
-    withdrawalApproved: {
-      subject: 'Withdrawal Approved - DZCASH',
-      html: ({ amount, method }) => `
-        <div style="font-family:sans-serif;max-width:480px;margin:0 auto;background:#0f172a;color:#f8fafc;padding:32px;border-radius:16px;border:1px solid #1e293b;">
-          <div style="text-align:center;font-size:24px;font-weight:800;color:#38bdf8;margin-bottom:24px;">DZCASH</div>
-          <h2 style="font-size:18px;margin:0 0 12px;">Withdrawal Approved! 🎉</h2>
-          <p style="font-size:14px;color:#94a3b8;margin:0 0 20px;">Your withdrawal has been approved and is being processed.</p>
-          <div style="background:#1e293b;padding:16px;border-radius:12px;margin:0 0 20px;">
-            <p style="font-size:12px;color:#64748b;margin:0 0 4px;">Amount</p>
-            <p style="font-size:20px;font-weight:800;color:#34d399;margin:0 0 12px;">$${amount}</p>
-            <p style="font-size:12px;color:#64748b;margin:0 0 4px;">Method</p>
-            <p style="font-size:14px;color:#f8fafc;margin:0;">${method}</p>
-          </div>
-          <p style="font-size:12px;color:#64748b;">Funds should arrive within 24-48 hours.</p>
-        </div>`,
-    },
-    withdrawalRejected: {
-      subject: 'Withdrawal Rejected - DZCASH',
-      html: ({ amount, reason }) => `
-        <div style="font-family:sans-serif;max-width:480px;margin:0 auto;background:#0f172a;color:#f8fafc;padding:32px;border-radius:16px;border:1px solid #1e293b;">
-          <div style="text-align:center;font-size:24px;font-weight:800;color:#38bdf8;margin-bottom:24px;">DZCASH</div>
-          <h2 style="font-size:18px;margin:0 0 12px;color:#f43f5e;">Withdrawal Rejected</h2>
-          <div style="background:#1e293b;padding:16px;border-radius:12px;margin:0 0 20px;">
-            <p style="font-size:12px;color:#64748b;margin:0 0 4px;">Amount</p>
-            <p style="font-size:20px;font-weight:800;color:#f43f5e;margin:0 0 12px;">$${amount}</p>
-            <p style="font-size:12px;color:#64748b;margin:0 0 4px;">Reason</p>
-            <p style="font-size:14px;color:#f8fafc;margin:0;">${reason}</p>
-          </div>
-          <p style="font-size:12px;color:#64748b;">Contact support if you have questions.</p>
-        </div>`,
-    },
-    fraudAlert: {
-      subject: 'Security Alert - DZCASH',
-      html: ({ trigger }) => `
-        <div style="font-family:sans-serif;max-width:480px;margin:0 auto;background:#0f172a;color:#f8fafc;padding:32px;border-radius:16px;border:1px solid #1e293b;">
-          <div style="text-align:center;font-size:24px;font-weight:800;color:#38bdf8;margin-bottom:24px;">DZCASH</div>
-          <h2 style="font-size:18px;margin:0 0 12px;color:#f43f5e;">Security Alert</h2>
-          <p style="font-size:14px;color:#94a3b8;margin:0 0 20px;">We detected unusual activity on your account:</p>
-          <div style="background:#1e293b;padding:12px 16px;border-radius:8px;margin:0 0 20px;font-size:13px;color:#f8fafc;">
-            ${trigger}
-          </div>
-          <p style="font-size:12px;color:#64748b;">If this was you, no action needed. Otherwise, contact support immediately.</p>
-        </div>`,
-    },
-    welcome: {
-      subject: 'Welcome to DZCASH!',
-      html: () => `
-        <div style="font-family:sans-serif;max-width:480px;margin:0 auto;background:#0f172a;color:#f8fafc;padding:32px;border-radius:16px;border:1px solid #1e293b;">
-          <div style="text-align:center;font-size:24px;font-weight:800;color:#38bdf8;margin-bottom:24px;">DZCASH</div>
-          <h2 style="font-size:18px;margin:0 0 12px;">Welcome! 🎉</h2>
-          <p style="font-size:14px;color:#94a3b8;margin:0 0 20px;">Start completing offers and earning rewards today!</p>
-          <a href="https://dzcash.com/offers" style="display:inline-block;background:#38bdf8;color:#0f172a;font-weight:700;padding:12px 24px;border-radius:8px;text-decoration:none;font-size:14px;">Browse Offers</a>
-        </div>`,
-    },
-  };
 }
+
+type HandlebarsTemplate = (vars: Record<string, any>) => string;

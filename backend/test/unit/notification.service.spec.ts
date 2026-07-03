@@ -170,7 +170,7 @@ describe('NotificationService', () => {
       mockPrisma.notification.create.mockResolvedValue(mockNotification);
       mockPrisma.user.findUnique.mockResolvedValue({ id: 'user-1', email: 'test@test.com' });
 
-      await service.onFraudAlert('user-1', 'VPN_DETECTED', '45', 'test@test.com');
+      await service.onFraudAlert('user-1', 'VPN_DETECTED', 45, 'test@test.com');
       expect(mockEmailService.sendFraudAlert).toHaveBeenCalledWith('test@test.com', 'VPN_DETECTED');
     });
   });

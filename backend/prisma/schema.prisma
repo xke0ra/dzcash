@@ -24,6 +24,20 @@ enum OfferProvider {
   CPX
   OFFERTORO
   GENERIC
+  ADGATE_MEDIA
+  KIWIWALL
+  PERSONA
+  REVSHARE
+  MONETIZER
+  OFFERFLOOD
+  ADWALL
+  TIME_WALL
+  SURVEY_SPOT
+  OFFER_ENGINE
+  ADWORKSHUB
+  REVENUE_UNIT
+  OFFER_YE
+  MONETAG
 }
 
 enum ClickStatus {
@@ -50,6 +64,10 @@ enum WithdrawalMethod {
   PAYPAL
   CRYPTO
   GIFT_CARD
+  USDT_TRC20
+  GIFT_CARD_AMAZON
+  GIFT_CARD_GOOGLE_PLAY
+  MOBILE_MONEY
 }
 
 enum WithdrawalStatus {
@@ -57,6 +75,9 @@ enum WithdrawalStatus {
   APPROVED
   REJECTED
   FAILED
+  AUTO_APPROVED
+  PROCESSING
+  COMPLETED
 }
 
 enum FraudTriggerType {
@@ -65,6 +86,49 @@ enum FraudTriggerType {
   HIGH_VELOCITY
   DEVICE_FINGERPRINT_CLONE
   GEO_INCONSISTENCY
+  EMAIL_REPUTATION
+  TIME_ANOMALY
+  CIRCULAR_REFERRAL
+  WITHDRAWAL_VELOCITY
+  SUSPICIOUS_CLICK
+  MULTIPLE_ACCOUNTS
+  ABNORMAL_PATTERN
+}
+
+enum XpSource {
+  OFFER_COMPLETED
+  DAILY_LOGIN
+  STREAK_BONUS
+  CHALLENGE_COMPLETED
+  BADGE_EARNED
+  REFERRAL_BONUS
+  WITHDRAWAL_COMPLETED
+  LEVEL_UP_REWARD
+  ADMIN_ADJUSTMENT
+}
+
+enum LeaderboardPeriod {
+  DAILY
+  WEEKLY
+  MONTHLY
+  ALL_TIME
+}
+
+enum BadgeCategory {
+  OFFERS
+  REFERRALS
+  WITHDRAWALS
+  STREAKS
+  LEVELS
+  CHALLENGES
+  SPECIAL
+}
+
+enum ChallengeStatus {
+  ACTIVE
+  COMPLETED
+  EXPIRED
+  CANCELLED
 }
 
 model User {
@@ -78,10 +142,15 @@ model User {
   status           UserStatus     @default(ACTIVE)
   role             UserRole       @default(USER)
   riskScore        Float          @default(0.0)
+  deletedAt        DateTime?
   createdAt        DateTime       @default(now())
   updatedAt        DateTime       @updatedAt
   
   emailVerified    Boolean          @default(false)
+  ipAddress        String?
+  totpSecret       String?
+  totpEnabled      Boolean          @default(false)
+  notificationPrefs Json?
   notifications    Notification[]
   wallet           Wallet?
   sessions         Session[]
@@ -90,11 +159,138 @@ model User {
   withdrawals      Withdrawal[]
   fraudLogs        FraudLog[]
   auditLogs        AuditLog[]     @relation("AuditLogUser")
+  xp               UserXp?
+  xpTransactions   XpTransaction[]
+  userBadges       UserBadge[]
+  leaderboardEntries LeaderboardEntry[]
+  userChallenges   UserChallenge[]
+  dailyStreak      DailyStreak?
+  withdrawalSchedule WithdrawalSchedule?
+  pushSubscriptions PushSubscription[]
+  behaviorBaseline  UserBehaviorBaseline?
 
   @@index([status])
   @@index([role])
   @@index([riskScore])
   @@index([createdAt])
+  @@index([ipAddress])
+}
+
+model UserXp {
+  id         String   @id @default(uuid())
+  userId     String   @unique
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  totalXp    Int      @default(0)
+  level      Int      @default(1)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+}
+
+model XpTransaction {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  amount    Int      // Positive for earned, negative for spent
+  source    XpSource
+  reference String?  // e.g. offer_id, challenge_id, badge_id
+  note      String?
+  createdAt DateTime @default(now())
+
+  @@index([userId, createdAt])
+  @@index([userId, source])
+}
+
+model Badge {
+  id          String        @id @default(uuid())
+  key         String        @unique // e.g. 'first_offer', 'level_10', 'streak_7'
+  name        String        // e.g. "First Steps"
+  description String        // e.g. "Complete your first offer"
+  iconUrl     String?       // URL to badge SVG/PNG
+  category    BadgeCategory
+  criteria    Json          // e.g. { "type": "offer_count", "threshold": 1 }
+  xpReward    Int           @default(0) // XP awarded when badge is earned
+  order       Int           @default(0)
+  createdAt   DateTime      @default(now())
+  userBadges  UserBadge[]
+}
+
+model UserBadge {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  badgeId   String
+  badge     Badge    @relation(fields: [badgeId], references: [id])
+  xpAwarded Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@unique([userId, badgeId])
+  @@index([userId])
+}
+
+model DailyStreak {
+  id             String   @id @default(uuid())
+  userId         String   @unique
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  currentStreak  Int      @default(0)
+  longestStreak  Int      @default(0)
+  lastLoginDate  DateTime?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+}
+
+model Challenge {
+  id           String          @id @default(uuid())
+  key          String          @unique // e.g. 'challenge_5_offers_today'
+  name         String          // e.g. "5 Offers Challenge"
+  description  String          // e.g. "Complete 5 offers today for a bonus"
+  criteria     Json            // e.g. { "type": "offer_count", "threshold": 5, "period": "daily" }
+  xpReward     Int             @default(0)
+  bonusAmount  Decimal         @default(0.00) @db.Decimal(10, 4) // Cash bonus
+  startsAt     DateTime
+  endsAt       DateTime
+  status       ChallengeStatus @default(ACTIVE)
+  createdAt    DateTime        @default(now())
+  userChallenges UserChallenge[]
+}
+
+model UserChallenge {
+  id          String          @id @default(uuid())
+  userId      String
+  user        User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  challengeId String
+  challenge   Challenge       @relation(fields: [challengeId], references: [id])
+  progress    Int             @default(0) // Current progress towards threshold
+  completed   Boolean         @default(false)
+  rewardClaimed Boolean       @default(false)
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+
+  @@unique([userId, challengeId])
+  @@index([userId])
+  @@index([challengeId])
+}
+
+model LeaderboardEntry {
+  id        String            @id @default(uuid())
+  userId    String
+  user      User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  score     Int               @default(0)
+  period    LeaderboardPeriod
+  rank      Int?
+  createdAt DateTime          @default(now())
+  updatedAt DateTime          @updatedAt
+
+  @@unique([userId, period])
+  @@index([period, score])
+  @@index([period, rank])
+}
+
+model XpLevel {
+  level     Int      @id // 1-100
+  xpRequired Int     // XP needed to reach this level
+  title     String   // e.g. "Bronze I", "Silver III"
+  reward    Json?    // e.g. { "bonusPercent": 5, "withdrawalFeeDiscount": 0.5 }
+  createdAt DateTime @default(now())
 }
 
 model Session {
@@ -106,6 +302,9 @@ model Session {
   ipAddress    String?
   userAgent    String?
   createdAt    DateTime @default(now())
+
+  @@index([userId, expiresAt])
+  @@index([expiresAt])
 }
 
 model Wallet {
@@ -115,6 +314,19 @@ model Wallet {
   pendingBalance   Decimal  @default(0.00) @db.Decimal(12, 4)
   availableBalance Decimal  @default(0.00) @db.Decimal(12, 4)
   updatedAt        DateTime @updatedAt
+
+  @@index([updatedAt])
+}
+
+model OfferCategory {
+  id        String   @id @default(uuid())
+  name      String   @unique
+  slug      String   @unique
+  icon      String   @default("📋")
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  offers    Offer[]
 }
 
 model Offer {
@@ -123,15 +335,39 @@ model Offer {
   providerId    String        // Remote offer ID inside the network
   name          String
   description   String
+  categoryId    String?
+  category      OfferCategory? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  imageUrl      String?
   payoutAmount  Decimal       @db.Decimal(10, 4) // What the advertiser pays us
   rewardAmount  Decimal       @db.Decimal(10, 4) // What we pay the user
   status        Boolean       @default(true)
   targetUrl     String        // URL containing macro placeholders
+  countries     Json?         // Array of country codes
+  devices       String[]      // Desktop, Mobile, Tablet
+  requirements  String?
+  instructions  String?
+  providerMetadata Json?      // Provider-specific metadata
   createdAt     DateTime      @default(now())
   updatedAt     DateTime      @updatedAt
   clicks        Click[]
 
   @@unique([provider, providerId])
+  @@index([categoryId])
+  @@index([status])
+}
+
+model SyncMetadata {
+  id             String        @id @default(uuid())
+  provider       OfferProvider @unique
+  lastSyncAt     DateTime?
+  status         String        @default("idle") // idle, syncing, error
+  offersFound    Int           @default(0)
+  offersAdded    Int           @default(0)
+  offersUpdated  Int           @default(0)
+  offersRemoved  Int           @default(0)
+  errorMessage   String?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
 }
 
 model Click {
@@ -147,6 +383,11 @@ model Click {
   status            ClickStatus  @default(CLICKED)
   createdAt         DateTime     @default(now())
   transaction       Transaction?
+
+  @@index([userId, createdAt])
+  @@index([offerId, status])
+  @@index([deviceFingerprint])
+  @@index([ip])
 }
 
 model Transaction {
@@ -163,33 +404,97 @@ model Transaction {
   notes        String?
   createdAt    DateTime          @default(now())
   updatedAt    DateTime          @updatedAt
+
+  @@index([userId, type, status])
+  @@index([userId, createdAt])
+  @@index([type, status, createdAt])
 }
 
 model Withdrawal {
   id           String           @id @default(uuid())
   userId       String
-  user             User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user         User             @relation(fields: [userId], references: [id], onDelete: Cascade)
   method       WithdrawalMethod
   status       WithdrawalStatus @default(PENDING)
   amount       Decimal          @db.Decimal(12, 4)
+  fee          Decimal          @default(0.00) @db.Decimal(10, 4)
+  netAmount    Decimal          @db.Decimal(12, 4)
   details      Json             // E.g. email for Paypal, wallet address for crypto
+  autoApproved Boolean          @default(false)
   processedAt  DateTime?
+  completedAt  DateTime?
   createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
   transaction  Transaction?
+
+  @@index([userId, createdAt])
+  @@index([status, createdAt])
+}
+
+model WithdrawalSchedule {
+  id             String           @id @default(uuid())
+  userId         String           @unique
+  user           User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  method         WithdrawalMethod
+  details        Json
+  threshold      Decimal          @db.Decimal(12, 4) // Auto-withdraw when balance >= this
+  enabled        Boolean          @default(true)
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
 }
 
 model FraudLog {
   id          String           @id @default(uuid())
   userId      String
-  user             User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user        User             @relation(fields: [userId], references: [id], onDelete: Cascade)
   clickId     String?
   triggerType FraudTriggerType
   score       Float
   details     Json
+  resolved    Boolean          @default(false)
+  resolvedAt  DateTime?
+  resolvedBy  String?
+  resolvedNote String?
   createdAt   DateTime         @default(now())
 
   @@index([userId, createdAt])
   @@index([triggerType])
+  @@index([resolved])
+}
+
+model FraudRule {
+  id          String   @id @default(uuid())
+  name        String   @unique
+  description String?
+  triggerType FraudTriggerType
+  weight      Int      @default(30)
+  enabled     Boolean  @default(true)
+  threshold   Int?
+  cooldownSec Int?
+  totalTriggers   Int @default(0)
+  sustainedCount  Int @default(0)
+  dismissedCount  Int @default(0)
+  currentPrecision Float @default(0.0)
+  lastWeightAdjustment DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model UserBehaviorBaseline {
+  id        String   @id @default(uuid())
+  userId    String   @unique
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  avgClicksPerHour Float @default(0.0)
+  stdClicksPerHour Float @default(0.0)
+  commonHours      Int[] @default([])
+  commonIpPrefixes String[] @default([])
+  avgWithdrawalAmount Float @default(0.0)
+  stdWithdrawalAmount Float @default(0.0)
+  peakActivityStart Int @default(8)
+  peakActivityEnd   Int @default(23)
+  totalSessions    Int @default(0)
+  lastUpdated      DateTime @default(now())
+  updatedAt        DateTime @updatedAt
 }
 
 enum NotificationType {
@@ -223,6 +528,20 @@ model Notification {
   @@index([userId, read])
   @@index([userId, createdAt])
   @@index([type])
+}
+
+model PushSubscription {
+  id          String   @id @default(uuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  endpoint    String   @unique
+  p256dh      String
+  auth        String
+  userAgent   String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([userId])
 }
 
 model AuditLog {

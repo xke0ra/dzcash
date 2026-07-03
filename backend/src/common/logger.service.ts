@@ -4,7 +4,7 @@ import pino from 'pino';
 
 @Injectable()
 export class LoggerService implements OnModuleInit {
-  private logger: pino.Logger;
+  private logger!: pino.Logger;
 
   constructor(private config: ConfigService) {}
 

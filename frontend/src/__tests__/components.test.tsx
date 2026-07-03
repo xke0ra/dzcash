@@ -1,6 +1,8 @@
+import React from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { AuthProvider } from '../providers/auth-provider';
 
 // Mock next-intl
 vi.mock('next-intl', () => ({
@@ -29,12 +31,12 @@ vi.mock('js-cookie', () => ({
 
 describe('LanguageSwitcher', () => {
   beforeEach(async () => {
-    const { default: LanguageSwitcher } = await import('../../components/LanguageSwitcher');
+    const { default: LanguageSwitcher } = await import('../components/LanguageSwitcher');
     render(<LanguageSwitcher />);
   });
 
   it('renders current language', () => {
-    expect(screen.getByText('العربية')).toBeInTheDocument();
+    expect(screen.getAllByText('العربية')).toHaveLength(2);
   });
 });
 
@@ -48,8 +50,12 @@ describe('NotificationBell', () => {
       }),
     ) as any;
 
-    const { default: NotificationBell } = await import('../../components/NotificationBell');
-    render(<NotificationBell />);
+    const { default: NotificationBell } = await import('../components/NotificationBell');
+    render(
+      <AuthProvider>
+        <NotificationBell />
+      </AuthProvider>,
+    );
   });
 
   it('renders bell icon', () => {

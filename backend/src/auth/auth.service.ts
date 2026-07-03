@@ -1,18 +1,24 @@
-import { Injectable, ConflictException, UnauthorizedException, BadRequestException } from '@nestjs/common';
+import { Injectable, Logger, ConflictException, UnauthorizedException, BadRequestException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { PrismaService } from '../prisma/prisma.service';
+import { TwofaService } from '../twofa/twofa.service';
+import { GamificationService } from '../gamification/gamification.service';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
 import * as bcrypt from 'bcrypt';
-import { crypto } from 'crypto';
+import * as crypto from 'crypto';
 import { EmailService } from '../email/email.service';
 
 @Injectable()
 export class AuthService {
+  private readonly logger = new Logger(AuthService.name);
+
   constructor(
     private prisma: PrismaService,
     private jwtService: JwtService,
     private emailService: EmailService,
+    private twofaService: TwofaService,
+    private gamificationService: GamificationService,
   ) {}
 
   async register(dto: RegisterDto) {
@@ -73,6 +79,12 @@ export class AuthService {
 
     this.emailService.sendWelcome(newUser.email).catch(() => {});
 
+    if (referredById) {
+      this.gamificationService.handleReferralBonus(referredById, newUser.id).catch((err) =>
+        this.logger.warn(`Gamification referral hook failed: ${err.message}`),
+      );
+    }
+
     return {
       message: 'Registration successful',
       userId: newUser.id,
@@ -90,8 +102,16 @@ export class AuthService {
       throw new UnauthorizedException('Invalid email or password');
     }
 
+    if (user.deletedAt) {
+      throw new UnauthorizedException('This account has been deleted');
+    }
+
     if (user.status === 'SUSPENDED') {
       throw new UnauthorizedException('This account has been suspended');
+    }
+
+    if (user.totpEnabled) {
+      return { needsTwoFactor: true, userId: user.id };
     }
 
     const tokens = await this.generateTokens(user.id, user.email);
@@ -102,6 +122,44 @@ export class AuthService {
         userId: user.id,
         refreshToken: tokens.refreshToken,
         expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days
+        ipAddress,
+        userAgent,
+      },
+    });
+
+    // Track daily login streak (fire-and-forget)
+    this.gamificationService.trackDailyLogin(user.id).catch((err) =>
+      this.logger.warn(`Failed to track daily login: ${err.message}`),
+    );
+
+    return {
+      user: {
+        id: user.id,
+        email: user.email,
+        status: user.status,
+        role: user.role,
+        riskScore: user.riskScore,
+      },
+      ...tokens,
+    };
+  }
+
+  async verifyTwoFactor(userId: string, token: string, ipAddress?: string, userAgent?: string) {
+    const valid = await this.twofaService.verify(userId, token);
+    if (!valid) {
+      throw new UnauthorizedException('Invalid 2FA code');
+    }
+
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (!user) throw new UnauthorizedException('User not found');
+
+    const tokens = await this.generateTokens(user.id, user.email);
+
+    await this.prisma.session.create({
+      data: {
+        userId: user.id,
+        refreshToken: tokens.refreshToken,
+        expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
         ipAddress,
         userAgent,
       },
@@ -124,6 +182,13 @@ export class AuthService {
       where: { refreshToken },
     });
     return { message: 'Logged out successfully' };
+  }
+
+  async logoutAllSessions(userId: string) {
+    await this.prisma.session.deleteMany({
+      where: { userId },
+    });
+    return { message: 'All sessions logged out successfully' };
   }
 
   async refresh(refreshToken: string, ipAddress?: string, userAgent?: string) {
@@ -169,12 +234,12 @@ export class AuthService {
     const payload = { sub: userId, email, role };
     
     const accessToken = this.jwtService.sign(payload, {
-      secret: process.env.JWT_SECRET || 'super-secret-jwt-key-change-this-in-production',
+      secret: process.env.JWT_SECRET,
       expiresIn: '15m',
     });
 
     const refreshToken = this.jwtService.sign(payload, {
-      secret: process.env.JWT_REFRESH_SECRET || 'super-secret-jwt-refresh-key-change-this-in-production',
+      secret: process.env.JWT_REFRESH_SECRET,
       expiresIn: '7d',
     });
 

@@ -1,0 +1,45 @@
+{
+  "title": "Redis Overview",
+  "uid": "redis-overview",
+  "tags": ["redis", "dzcash"],
+  "schemaVersion": 38,
+  "version": 1,
+  "panels": [
+    {
+      "title": "Connected Clients",
+      "type": "timeseries",
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0},
+      "targets": [{
+        "expr": "redis_connected_clients",
+        "legendFormat": "clients"
+      }]
+    },
+    {
+      "title": "Memory Usage",
+      "type": "timeseries",
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0},
+      "targets": [{
+        "expr": "redis_memory_used_bytes / 1024 / 1024",
+        "legendFormat": "memory (MB)"
+      }]
+    },
+    {
+      "title": "Commands per Second",
+      "type": "timeseries",
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 8},
+      "targets": [{
+        "expr": "rate(redis_commands_processed_total[1m])",
+        "legendFormat": "commands/s"
+      }]
+    },
+    {
+      "title": "Cache Hit Ratio",
+      "type": "timeseries",
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 8},
+      "targets": [{
+        "expr": "(redis_keyspace_hits_total / (redis_keyspace_hits_total + redis_keyspace_misses_total)) * 100",
+        "legendFormat": "hit ratio"
+      }]
+    }
+  ]
+}

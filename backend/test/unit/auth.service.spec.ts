@@ -120,6 +120,9 @@ describe('AuthService', () => {
 
       const result = await service.login(loginDto);
 
+      if ('needsTwoFactor' in result) {
+        throw new Error('Expected full login result, got needsTwoFactor');
+      }
       expect(result.accessToken).toBeDefined();
       expect(result.user.email).toBe('test@example.com');
       expect(result.user.role).toBe('USER');

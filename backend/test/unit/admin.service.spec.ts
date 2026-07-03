@@ -123,7 +123,7 @@ describe('AdminService', () => {
       mockPrisma.user.findMany.mockResolvedValue([{ id: 'user-1', email: 'test@test.com' }]);
       mockPrisma.user.count.mockResolvedValue(1);
 
-      const result = await service.getUsers({ page: 1, pageSize: 20 });
+      const result = await service.getUsers({ page: 1, limit: 20 });
       expect(result).toBeDefined();
     });
   });
@@ -135,7 +135,7 @@ describe('AdminService', () => {
       ]);
       mockPrisma.fraudLog.count.mockResolvedValue(1);
 
-      const result = await service.getFraudLogs({ page: 1, pageSize: 20 });
+      const result = await service.getFraudLogs({ page: 1, limit: 20 });
       expect(result).toBeDefined();
     });
   });
@@ -147,7 +147,7 @@ describe('AdminService', () => {
       ]);
       mockPrisma.auditLog.count.mockResolvedValue(1);
 
-      const result = await service.getAuditLogs({ page: 1, pageSize: 20 });
+      const result = await service.getAuditLogs({ page: 1, limit: 20 });
       expect(result).toBeDefined();
     });
   });

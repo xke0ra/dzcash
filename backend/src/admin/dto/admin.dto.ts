@@ -1,10 +1,10 @@
-import { IsEnum, IsNotEmpty, IsOptional, IsString, MinLength } from 'class-validator';
-import { UserStatus, UserRole, OfferProvider, WithdrawalMethod } from '@prisma/client';
+import { IsEnum, IsNotEmpty, IsOptional, IsString, MinLength, IsArray, IsNumber, Min } from 'class-validator';
+import { UserStatus, UserRole, OfferProvider } from '@prisma/client';
 
 export class UpdateUserStatusDto {
   @IsEnum(UserStatus)
   @IsNotEmpty()
-  status: UserStatus;
+  status!: UserStatus;
 
   @IsString()
   @IsOptional()
@@ -14,12 +14,12 @@ export class UpdateUserStatusDto {
 export class UpdateUserRoleDto {
   @IsEnum(UserRole)
   @IsNotEmpty()
-  role: UserRole;
+  role!: UserRole;
 }
 
 export class OverrideRiskScoreDto {
   @IsNotEmpty()
-  score: number;
+  score!: number;
 
   @IsString()
   @IsOptional()
@@ -29,33 +29,61 @@ export class OverrideRiskScoreDto {
 export class CreateOfferDto {
   @IsEnum(OfferProvider)
   @IsNotEmpty()
-  provider: OfferProvider;
+  provider!: OfferProvider;
 
   @IsString()
   @IsNotEmpty()
-  providerId: string;
+  providerId!: string;
 
   @IsString()
   @IsNotEmpty()
   @MinLength(3)
-  name: string;
+  name!: string;
 
   @IsString()
   @IsNotEmpty()
-  description: string;
+  description!: string;
 
   @IsNotEmpty()
-  payoutAmount: number;
+  @IsNumber()
+  @Min(0.01)
+  payoutAmount!: number;
 
   @IsNotEmpty()
-  rewardAmount: number;
+  @IsNumber()
+  @Min(0.01)
+  rewardAmount!: number;
 
   @IsString()
   @IsNotEmpty()
-  targetUrl: string;
+  targetUrl!: string;
 
   @IsOptional()
   status?: boolean;
+
+  @IsString()
+  @IsOptional()
+  categoryId?: string;
+
+  @IsString()
+  @IsOptional()
+  imageUrl?: string;
+
+  @IsArray()
+  @IsOptional()
+  countries?: string[];
+
+  @IsArray()
+  @IsOptional()
+  devices?: string[];
+
+  @IsString()
+  @IsOptional()
+  requirements?: string;
+
+  @IsString()
+  @IsOptional()
+  instructions?: string;
 }
 
 export class UpdateOfferDto {
@@ -68,9 +96,13 @@ export class UpdateOfferDto {
   description?: string;
 
   @IsOptional()
+  @IsNumber()
+  @Min(0.01)
   payoutAmount?: number;
 
   @IsOptional()
+  @IsNumber()
+  @Min(0.01)
   rewardAmount?: number;
 
   @IsString()
@@ -79,18 +111,79 @@ export class UpdateOfferDto {
 
   @IsOptional()
   status?: boolean;
+
+  @IsString()
+  @IsOptional()
+  categoryId?: string;
+
+  @IsString()
+  @IsOptional()
+  imageUrl?: string;
+
+  @IsArray()
+  @IsOptional()
+  countries?: string[];
+
+  @IsArray()
+  @IsOptional()
+  devices?: string[];
+
+  @IsString()
+  @IsOptional()
+  requirements?: string;
+
+  @IsString()
+  @IsOptional()
+  instructions?: string;
+}
+
+export class CreateCategoryDto {
+  @IsString()
+  @IsNotEmpty()
+  @MinLength(2)
+  name!: string;
+
+  @IsString()
+  @IsNotEmpty()
+  slug!: string;
+
+  @IsString()
+  @IsOptional()
+  icon?: string;
+
+  @IsOptional()
+  @IsNumber()
+  sortOrder?: number;
+}
+
+export class UpdateCategoryDto {
+  @IsString()
+  @IsOptional()
+  name?: string;
+
+  @IsString()
+  @IsOptional()
+  slug?: string;
+
+  @IsString()
+  @IsOptional()
+  icon?: string;
+
+  @IsOptional()
+  @IsNumber()
+  sortOrder?: number;
 }
 
 export class RejectWithdrawalDto {
   @IsString()
   @IsNotEmpty()
-  reason: string;
+  reason!: string;
 }
 
 export class ReviewFraudDto {
   @IsEnum(['dismiss', 'sustain'])
   @IsNotEmpty()
-  action: 'dismiss' | 'sustain';
+  action!: 'dismiss' | 'sustain';
 
   @IsString()
   @IsOptional()

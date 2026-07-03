@@ -5,11 +5,11 @@ import { SkipThrottle } from '@nestjs/throttler';
 import { ApiTags, ApiOperation } from '@nestjs/swagger';
 
 @ApiTags('Metrics')
-@Controller('api')
+@Controller('metrics')
 export class MetricsController {
   constructor(private metrics: MetricsService) {}
 
-  @Get('metrics')
+  @Get()
   @SkipThrottle()
   @ApiOperation({ summary: 'Prometheus metrics endpoint' })
   async getMetrics(@Res() res: Response) {

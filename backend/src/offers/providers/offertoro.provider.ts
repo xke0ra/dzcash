@@ -1,48 +1,35 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
+import { BaseProvider, SyncOffer } from './base-provider';
 import { OfferProviderInterface, PostbackData } from './offer-provider.interface';
 import * as crypto from 'crypto';
 
 @Injectable()
-export class OfferToroProvider implements OfferProviderInterface {
-  private readonly logger = new Logger(OfferToroProvider.name);
-  private readonly secret = process.env.OFFERTORO_SECRET || 'offertoro_secret_key_abcdef';
+export class OfferToroProvider extends BaseProvider implements OfferProviderInterface {
+  protected readonly providerName = 'OfferToro';
+  protected readonly baseUrl = 'https://offertoro.com';
+  private readonly secret = process.env.OFFERTORO_SECRET || 'offertoro-dev-secret';
 
   getProviderName(): string {
-    return 'OFFERTORO';
+    return this.providerName;
   }
 
-  async validatePostback(
-    query: Record<string, any>,
-    headers: Record<string, any>,
-    body: Record<string, any>,
-  ): Promise<boolean> {
-    const { click_id, payout, o_id, sig } = query;
-
-    if (!click_id || !payout || !o_id || !sig) {
-      this.logger.error('OfferToro Postback missing required fields');
-      return false;
-    }
-
-    // OfferToro Signature Scheme: MD5 of "o_id:click_id:secret"
-    const hash = crypto.createHash('md5');
-    const computedSignature = hash
-      .update(`${o_id}:${click_id}:${this.secret}`)
-      .digest('hex');
-
-    const isValid = sig.toLowerCase() === computedSignature.toLowerCase();
-
-    if (!isValid) {
-      this.logger.warn(`OfferToro Postback signature invalid. Expected: ${computedSignature}, Received: ${sig}`);
-    }
-
-    return isValid;
+  async validatePostback(query: Record<string, any>, _headers: Record<string, any>, _body: Record<string, any>): Promise<boolean> {
+    const { o_id, click_id, signature } = query;
+    if (!signature) return false;
+    const expected = crypto.createHash('md5').update(`${o_id}:${click_id}:${this.secret}`).digest('hex');
+    return signature === expected;
   }
 
-  extractPostbackData(query: Record<string, any>, body: Record<string, any>): PostbackData {
+  extractPostbackData(query: Record<string, any>, _body: Record<string, any>): PostbackData {
     return {
       clickId: query.click_id,
-      payout: parseFloat(query.payout),
-      externalStatus: query.status || '1',
+      payout: parseFloat(query.payout || '0'),
+      externalStatus: query.status || 'completed',
+      signature: query.signature,
     };
+  }
+
+  async syncOffers(): Promise<SyncOffer[]> {
+    return this.generateMockOffers(10);
   }
 }

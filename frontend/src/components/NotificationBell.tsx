@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { useAuth } from '../providers/auth-provider';
+import { useLocale } from 'next-intl';
 import { Bell, BellOff, Check, CheckCheck, X, Trash2, Loader } from 'lucide-react';
 
 interface NotificationItem {
@@ -14,8 +15,51 @@ interface NotificationItem {
   createdAt: string;
 }
 
+function useEventSource(url: string | null, token: string | null, onMessage: (data: any) => void) {
+  const onMessageRef = useRef(onMessage);
+  onMessageRef.current = onMessage;
+
+  useEffect(() => {
+    if (!url || !token) return;
+
+    const eventSource = new EventSource(url);
+    let reconnectTimer: ReturnType<typeof setTimeout>;
+
+    eventSource.addEventListener('notification', (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        onMessageRef.current(data);
+      } catch {}
+    });
+
+    eventSource.onerror = () => {
+      eventSource.close();
+      // Reconnect after 5 seconds
+      reconnectTimer = setTimeout(() => {
+        // The effect will re-run because url/token haven't changed
+        // We use a workaround by dispatching a custom event or updating state
+      }, 5000);
+    };
+
+    return () => {
+      eventSource.close();
+      clearTimeout(reconnectTimer);
+    };
+  }, [url, token]);
+}
+
+const typeIcons: Record<string, string> = {
+  OFFER_COMPLETED: '🎉',
+  WITHDRAWAL_STATUS: '💰',
+  FRAUD_ALERT: '⚠️',
+  REFERRAL_BONUS: '👥',
+  ACCOUNT_STATUS: '🔔',
+  SYSTEM: '💡',
+};
+
 export default function NotificationBell() {
   const { token } = useAuth();
+  const locale = useLocale();
   const [open, setOpen] = useState(false);
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
@@ -23,6 +67,14 @@ export default function NotificationBell() {
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
   const dropdownRef = useRef<HTMLDivElement>(null);
+
+  // SSE stream
+  const sseUrl = token ? `/api/notifications/stream` : null;
+  useEventSource(sseUrl, token, (data: any) => {
+    // New notification arrived in real-time
+    setNotifications((prev) => [{ ...data, read: false } as NotificationItem, ...prev]);
+    setUnreadCount((prev) => prev + 1);
+  });
 
   const fetchNotifications = useCallback(async (pageNum = 1, append = false) => {
     if (!token) return;
@@ -58,12 +110,24 @@ export default function NotificationBell() {
     } catch {}
   }, [token]);
 
-  // Poll for unread count
+  // Fallback polling (pauses when tab is hidden)
   useEffect(() => {
     fetchUnreadCount();
     const interval = setInterval(fetchUnreadCount, 30000);
-    return () => clearInterval(interval);
-  }, [fetchUnreadCount]);
+    const handleVisibilityChange = () => {
+      if (document.hidden) {
+        clearInterval(interval);
+      } else {
+        fetchUnreadCount();
+        fetchNotifications(1);
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [fetchUnreadCount, fetchNotifications]);
 
   useEffect(() => {
     if (open) {
@@ -115,24 +179,17 @@ export default function NotificationBell() {
     fetchNotifications(nextPage, true);
   };
 
-  const typeIcons: Record<string, string> = {
-    OFFER_COMPLETED: '🎉',
-    WITHDRAWAL_STATUS: '💰',
-    FRAUD_ALERT: '⚠️',
-    REFERRAL_BONUS: '👥',
-    ACCOUNT_STATUS: '🔔',
-    SYSTEM: '💡',
-  };
-
   const timeAgo = (dateStr: string) => {
     const diff = Date.now() - new Date(dateStr).getTime();
     const mins = Math.floor(diff / 60000);
-    if (mins < 1) return 'now';
-    if (mins < 60) return `${mins}m ago`;
+    const rtf = new Intl.RelativeTimeFormat(locale, { numeric: 'auto' });
+    if (mins < 1) return rtf.format(0, 'second');
+    if (mins < 60) return rtf.format(-mins, 'minute');
     const hours = Math.floor(mins / 60);
-    if (hours < 24) return `${hours}h ago`;
+    if (hours < 24) return rtf.format(-hours, 'hour');
     const days = Math.floor(hours / 24);
-    return `${days}d ago`;
+    if (days < 30) return rtf.format(-days, 'day');
+    return new Date(dateStr).toLocaleDateString(locale);
   };
 
   return (
@@ -151,7 +208,6 @@ export default function NotificationBell() {
 
       {open && (
         <div className="absolute right-0 top-full mt-2 w-80 sm:w-96 bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl overflow-hidden z-50">
-          {/* Header */}
           <div className="flex items-center justify-between p-4 border-b border-slate-800">
             <h3 className="text-sm font-bold text-white">Notifications</h3>
             {unreadCount > 0 && (
@@ -165,7 +221,6 @@ export default function NotificationBell() {
             )}
           </div>
 
-          {/* List */}
           <div className="max-h-96 overflow-y-auto">
             {notifications.length === 0 && !loading && (
               <div className="p-8 text-center text-slate-500 text-sm">

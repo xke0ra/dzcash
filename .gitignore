@@ -1,0 +1,13 @@
+node_modules/
+dist/
+.next/
+.env
+.env.local
+*.log
+.pnpm-store
+.turbo/
+coverage/
+.nyc_output/
+
+# Secrets
+secrets/*.txt

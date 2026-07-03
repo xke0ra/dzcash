@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException, BadRequestException, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { WalletService } from '../wallet/wallet.service';
+import { OfferSyncService } from '../offers/offer-sync.service';
 import { UserStatus, UserRole, Prisma } from '@prisma/client';
 import { PaginationQueryDto } from './dto/admin.dto';
 import { NotificationService } from '../notification/notification.service';
@@ -13,6 +14,7 @@ export class AdminService {
     private prisma: PrismaService,
     private walletService: WalletService,
     private notifications: NotificationService,
+    private offerSyncService: OfferSyncService,
   ) {}
 
   async getDashboardStats() {
@@ -21,9 +23,9 @@ export class AdminService {
     const last24h = new Date(now.getTime() - 24 * 60 * 60 * 1000);
 
     const [totalUsers, newUsersToday, activeUsers, totalOffers, totalClicks, convertedClicks, pendingWithdrawalsCount, fraudAlertsToday, earningsAgg, withdrawalAgg] = await Promise.all([
-      this.prisma.user.count(),
-      this.prisma.user.count({ where: { createdAt: { gte: todayStart } } }),
-      this.prisma.user.count({ where: { status: UserStatus.ACTIVE } }),
+      this.prisma.user.count({ where: { deletedAt: null } }),
+      this.prisma.user.count({ where: { createdAt: { gte: todayStart }, deletedAt: null } }),
+      this.prisma.user.count({ where: { status: UserStatus.ACTIVE, deletedAt: null } }),
       this.prisma.offer.count({ where: { status: true } }),
       this.prisma.click.count(),
       this.prisma.click.count({ where: { status: 'CONVERTED' } }),
@@ -63,7 +65,7 @@ export class AdminService {
     const limit = Math.min(query.limit || 25, 100);
     const skip = (page - 1) * limit;
 
-    const where: Prisma.UserWhereInput = {};
+    const where: Prisma.UserWhereInput = { deletedAt: null };
     if (query.search) {
       where.email = { contains: query.search, mode: 'insensitive' };
     }
@@ -259,6 +261,7 @@ export class AdminService {
         take: limit,
         orderBy: { createdAt: 'desc' },
         include: {
+          category: { select: { id: true, name: true, slug: true, icon: true } },
           _count: { select: { clicks: true } },
         },
       }),
@@ -277,6 +280,12 @@ export class AdminService {
     rewardAmount: number;
     targetUrl: string;
     status?: boolean;
+    categoryId?: string;
+    imageUrl?: string;
+    countries?: string[];
+    devices?: string[];
+    requirements?: string;
+    instructions?: string;
   }) {
     if (data.payoutAmount <= data.rewardAmount) {
       throw new BadRequestException('payoutAmount must be greater than rewardAmount');
@@ -291,6 +300,14 @@ export class AdminService {
     rewardAmount: number;
     targetUrl: string;
     status: boolean;
+    provider: string;
+    providerId: string;
+    categoryId: string;
+    imageUrl: string;
+    countries: string[];
+    devices: string[];
+    requirements: string;
+    instructions: string;
   }>) {
     const offer = await this.prisma.offer.findUnique({ where: { id } });
     if (!offer) throw new NotFoundException('Offer not found');
@@ -298,7 +315,7 @@ export class AdminService {
     if (data.payoutAmount !== undefined && data.rewardAmount !== undefined && data.payoutAmount <= data.rewardAmount) {
       throw new BadRequestException('payoutAmount must be greater than rewardAmount');
     }
-    return this.prisma.offer.update({ where: { id }, data });
+    return this.prisma.offer.update({ where: { id }, data: data as any });
   }
 
   async toggleOfferStatus(id: string) {
@@ -316,6 +333,8 @@ export class AdminService {
     const skip = (page - 1) * limit;
 
     const where: Prisma.FraudLogWhereInput = {};
+    if (query.status === 'open') where.resolved = false;
+    else if (query.status === 'resolved') where.resolved = true;
 
     const [logs, total] = await Promise.all([
       this.prisma.fraudLog.findMany({
@@ -388,8 +407,44 @@ export class AdminService {
           metadata: metadata ? { description: metadata } : undefined,
         },
       });
-    } catch (error) {
+    } catch (error: any) {
       this.logger.error(`Failed to log audit: ${error.message}`);
     }
+  }
+
+  // === Categories ===
+
+  async getCategories() {
+    return this.prisma.offerCategory.findMany({
+      orderBy: { sortOrder: 'asc' },
+      include: { _count: { select: { offers: true } } },
+    });
+  }
+
+  async createCategory(data: { name: string; slug: string; icon?: string; sortOrder?: number }) {
+    return this.prisma.offerCategory.create({ data });
+  }
+
+  async updateCategory(id: string, data: Partial<{ name: string; slug: string; icon: string; sortOrder: number }>) {
+    const cat = await this.prisma.offerCategory.findUnique({ where: { id } });
+    if (!cat) throw new NotFoundException('Category not found');
+    return this.prisma.offerCategory.update({ where: { id }, data });
+  }
+
+  async deleteCategory(id: string) {
+    const cat = await this.prisma.offerCategory.findUnique({ where: { id } });
+    if (!cat) throw new NotFoundException('Category not found');
+    await this.prisma.offer.updateMany({ where: { categoryId: id }, data: { categoryId: null } });
+    return this.prisma.offerCategory.delete({ where: { id } });
+  }
+
+  // === Offer Sync ===
+
+  async syncAllOffers() {
+    return this.offerSyncService.syncAll();
+  }
+
+  async getSyncStatus() {
+    return this.offerSyncService.getSyncStatus();
   }
 }

@@ -1,6 +1,7 @@
 import { Controller, Get, Post, Query, Req, UseGuards, Param, Headers, Body, HttpStatus, HttpCode } from '@nestjs/common';
 import { TrackingService } from './tracking.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { IpWhitelistGuard } from '../common/ip-whitelist.guard';
 import { Request } from 'express';
 
 @Controller('tracking')
@@ -15,11 +16,12 @@ export class TrackingController {
   ) {
     const ip = req.ip || req.socket.remoteAddress || '';
     const userAgent = req.headers['user-agent'] || '';
-    const fingerprint = req.headers['x-device-fingerprint'] as string; // Optional device fingerprint header
+    const fingerprint = req.headers['x-device-fingerprint'] as string;
     return this.trackingService.createClick(req.user.id, offerId, ip, userAgent, fingerprint);
   }
 
   @Get('postback/:provider')
+  @UseGuards(IpWhitelistGuard)
   @HttpCode(HttpStatus.OK)
   async handleGetPostback(
     @Param('provider') provider: string,
@@ -33,6 +35,7 @@ export class TrackingController {
   }
 
   @Post('postback/:provider')
+  @UseGuards(IpWhitelistGuard)
   @HttpCode(HttpStatus.OK)
   async handlePostPostback(
     @Param('provider') provider: string,

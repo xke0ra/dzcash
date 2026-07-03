@@ -15,6 +15,7 @@ export class UsersService {
         riskScore: true,
         referralCode: true,
         createdAt: true,
+        notificationPrefs: true,
         wallet: {
           select: {
             pendingBalance: true,
@@ -44,5 +45,38 @@ export class UsersService {
     });
 
     return referrals;
+  }
+
+  async softDelete(userId: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+    });
+
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: {
+        deletedAt: new Date(),
+        status: 'SUSPENDED' as any,
+      },
+    });
+  }
+
+  async updateNotificationPrefs(userId: string, prefs: Record<string, boolean>) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+    });
+
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: { notificationPrefs: prefs },
+    });
   }
 }

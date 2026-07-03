@@ -1,4 +1,4 @@
-import { Controller, Get, Req, UseGuards } from '@nestjs/common';
+import { Controller, Get, UseGuards, Req } from '@nestjs/common';
 import { FraudService } from './fraud.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { PrismaService } from '../prisma/prisma.service';
@@ -17,6 +17,7 @@ export class FraudController {
     return this.prisma.fraudLog.findMany({
       where: { userId: req.user.id },
       orderBy: { createdAt: 'desc' },
+      take: 50,
     });
   }
 }

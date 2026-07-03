@@ -1,0 +1,86 @@
+volumes:
+  postgres_data:
+  redis_data:
+  prometheus_data:
+  grafana_data:
+
+networks:
+  dzcash:
+    driver: bridge
+
+secrets:
+  postgres_password:
+    file: ./secrets/postgres_password.txt
+  redis_password:
+    file: ./secrets/redis_password.txt
+  jwt_secret:
+    file: ./secrets/jwt_secret.txt
+  jwt_refresh_secret:
+    file: ./secrets/jwt_refresh_secret.txt
+  cpx_secret:
+    file: ./secrets/cpx_secret.txt
+  offertoro_secret:
+    file: ./secrets/offertoro_secret.txt
+  ipqs_api_key:
+    file: ./secrets/ipqs_api_key.txt
+
+services:
+  postgres:
+    secrets:
+      - postgres_password
+    environment:
+      POSTGRES_PASSWORD_FILE: /run/secrets/postgres_password
+
+  redis:
+    secrets:
+      - redis_password
+    environment:
+      REDIS_PASSWORD_FILE: /run/secrets/redis_password
+
+  backend:
+    secrets:
+      - postgres_password
+      - redis_password
+      - jwt_secret
+      - jwt_refresh_secret
+      - cpx_secret
+      - offertoro_secret
+      - ipqs_api_key
+    environment:
+      NODE_ENV: production
+      LOG_LEVEL: info
+      APP_VERSION: 1.0.0
+      FRONTEND_URL: ${FRONTEND_URL:-https://dzcash.com}
+    deploy:
+      replicas: 2
+      update_config:
+        order: start-first
+      restart_policy:
+        condition: any
+
+  frontend:
+    deploy:
+      replicas: 2
+      update_config:
+        order: start-first
+      restart_policy:
+        condition: any
+
+  nginx:
+    ports:
+      - "80:80"
+      - "443:443"
+
+  prometheus:
+    deploy:
+      restart_policy:
+        condition: any
+
+  grafana:
+    deploy:
+      restart_policy:
+        condition: any
+
+  node-exporter:
+    deploy:
+      mode: global

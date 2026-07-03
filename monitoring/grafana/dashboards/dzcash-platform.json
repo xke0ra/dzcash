@@ -117,7 +117,7 @@
       "type": "gauge",
       "gridPos": { "h": 4, "w": 4, "x": 12, "y": 20 },
       "targets": [{
-        "expr": "rate(process_cpu_seconds_total{job='dzcash-backend'}[1m]) * 100"
+        "expr": "rate(dzcash_process_cpu_seconds_total{job='dzcash-backend'}[1m]) * 100"
       }]
     },
     {
@@ -125,7 +125,7 @@
       "type": "gauge",
       "gridPos": { "h": 4, "w": 4, "x": 16, "y": 20 },
       "targets": [{
-        "expr": "nodejs_heap_size_used_bytes{job='dzcash-backend'} / nodejs_heap_size_total_bytes{job='dzcash-backend'} * 100"
+        "expr": "dzcash_nodejs_heap_size_used_bytes{job='dzcash-backend'} / dzcash_nodejs_heap_size_total_bytes{job='dzcash-backend'} * 100"
       }]
     },
     {

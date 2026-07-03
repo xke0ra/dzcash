@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
+import { ScheduleModule } from '@nestjs/schedule';
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import { APP_GUARD } from '@nestjs/core';
 import { PrismaModule } from './prisma/prisma.module';
@@ -14,12 +15,16 @@ import { NotificationModule } from './notification/notification.module';
 import { HealthModule } from './health/health.module';
 import { MetricsModule } from './metrics/metrics.module';
 import { AdminModule } from './admin/admin.module';
+import { TwofaModule } from './twofa/twofa.module';
+import { GamificationModule } from './gamification/gamification.module';
+import { CommonModule } from './common/common.module';
 
 @Module({
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
     }),
+    ScheduleModule.forRoot(),
     ThrottlerModule.forRoot([
       {
         ttl: 60000,
@@ -27,6 +32,7 @@ import { AdminModule } from './admin/admin.module';
       },
     ]),
     PrismaModule,
+    CommonModule,
     AuthModule,
     UsersModule,
     WalletModule,
@@ -38,6 +44,8 @@ import { AdminModule } from './admin/admin.module';
     HealthModule,
     MetricsModule,
     AdminModule,
+    TwofaModule,
+    GamificationModule,
   ],
   providers: [
     {

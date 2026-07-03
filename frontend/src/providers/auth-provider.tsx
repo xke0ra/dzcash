@@ -1,6 +1,6 @@
 "use client";
 
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 
 interface User {
   id: string;
@@ -15,7 +15,7 @@ interface AuthContextType {
   user: User | null;
   token: string | null;
   isLoading: boolean;
-  login: (token: string, refreshToken: string, user: User) => void;
+  login: (accessToken: string, user: User) => void;
   logout: () => void;
   updateUser: (user: User) => void;
 }
@@ -28,44 +28,50 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    // Load auth data on initialization
-    const storedToken = localStorage.getItem('accessToken');
     const storedUser = localStorage.getItem('user');
-    if (storedToken && storedUser) {
+    if (storedUser) {
       try {
-        setToken(storedToken);
-        setUser(JSON.parse(storedUser));
-      } catch (e) {
-        localStorage.removeItem('accessToken');
+        const parsedUser = JSON.parse(storedUser);
+        setUser(parsedUser);
+        fetch('/api/auth/refresh', { method: 'POST' })
+          .then((res) => {
+            if (!res.ok) throw new Error();
+            return res.json();
+          })
+          .then((data) => {
+            if (data.accessToken) {
+              setToken(data.accessToken);
+            } else {
+              localStorage.removeItem('user');
+              setUser(null);
+            }
+          })
+          .catch(() => {
+            localStorage.removeItem('user');
+            setUser(null);
+          })
+          .finally(() => setIsLoading(false));
+      } catch {
         localStorage.removeItem('user');
+        setIsLoading(false);
       }
+    } else {
+      setIsLoading(false);
     }
-    setIsLoading(false);
   }, []);
 
-  const login = (accessToken: string, refreshToken: string, userData: User) => {
-    localStorage.setItem('accessToken', accessToken);
-    localStorage.setItem('refreshToken', refreshToken);
+  const login = (accessToken: string, userData: User) => {
     localStorage.setItem('user', JSON.stringify(userData));
     setToken(accessToken);
     setUser(userData);
   };
 
-  const logout = () => {
-    const refreshToken = localStorage.getItem('refreshToken');
-    if (refreshToken) {
-      fetch('/api/auth/logout', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ refreshToken }),
-      }).catch(() => {});
-    }
-    localStorage.removeItem('accessToken');
-    localStorage.removeItem('refreshToken');
+  const logout = useCallback(() => {
+    fetch('/api/auth/logout', { method: 'POST' }).catch(() => {});
     localStorage.removeItem('user');
     setToken(null);
     setUser(null);
-  };
+  }, []);
 
   const updateUser = (userData: User) => {
     localStorage.setItem('user', JSON.stringify(userData));

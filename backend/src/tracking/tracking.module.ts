@@ -4,9 +4,10 @@ import { TrackingController } from './tracking.controller';
 import { WalletModule } from '../wallet/wallet.module';
 import { OffersModule } from '../offers/offers.module';
 import { FraudModule } from '../fraud/fraud.module';
+import { GamificationModule } from '../gamification/gamification.module';
 
 @Module({
-  imports: [WalletModule, OffersModule, FraudModule],
+  imports: [WalletModule, OffersModule, FraudModule, GamificationModule],
   providers: [TrackingService],
   controllers: [TrackingController],
   exports: [TrackingService],
