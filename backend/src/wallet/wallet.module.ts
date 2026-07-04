@@ -10,4 +10,5 @@ import { FraudModule } from '../fraud/fraud.module';
   controllers: [WalletController],
   exports: [WalletService],
 })
+// eslint-disable-next-line @typescript-eslint/no-extraneous-class
 export class WalletModule {}

@@ -81,7 +81,7 @@ describe('WalletService', () => {
 
   describe('creditPending', () => {
     it('should credit pending balance and create transaction', async () => {
-      mockPrisma.$transaction.mockImplementation(async (cb: Function) => {
+      mockPrisma.$transaction.mockImplementation(async (cb: (...args: unknown[]) => unknown) => {
         mockTx.wallet.findUnique.mockResolvedValue({
           pendingBalance: { toNumber: () => 10 },
         });
@@ -109,7 +109,7 @@ describe('WalletService', () => {
     };
 
     it('should create withdrawal request', async () => {
-      mockPrisma.$transaction.mockImplementation(async (cb: Function) => {
+      mockPrisma.$transaction.mockImplementation(async (cb: (...args: unknown[]) => unknown) => {
         mockTx.user.findUnique.mockResolvedValue({ id: 'user-1', status: 'ACTIVE', riskScore: 20 });
         mockTx.wallet.findUnique.mockResolvedValue({
           availableBalance: { toNumber: () => 100 },
@@ -130,7 +130,7 @@ describe('WalletService', () => {
     });
 
     it('should reject withdrawal for frozen accounts', async () => {
-      mockPrisma.$transaction.mockImplementation(async (cb: Function) => {
+      mockPrisma.$transaction.mockImplementation(async (cb: (...args: unknown[]) => unknown) => {
         mockTx.user.findUnique.mockResolvedValue({ id: 'user-1', status: 'FROZEN' });
         return cb(mockTx);
       });
@@ -139,7 +139,7 @@ describe('WalletService', () => {
     });
 
     it('should reject if insufficient balance', async () => {
-      mockPrisma.$transaction.mockImplementation(async (cb: Function) => {
+      mockPrisma.$transaction.mockImplementation(async (cb: (...args: unknown[]) => unknown) => {
         mockTx.user.findUnique.mockResolvedValue({ id: 'user-1', status: 'ACTIVE', riskScore: 20 });
         mockTx.wallet.findUnique.mockResolvedValue({
           availableBalance: { toNumber: () => 10 },
@@ -153,7 +153,7 @@ describe('WalletService', () => {
 
   describe('approveWithdrawal', () => {
     it('should approve and send notification', async () => {
-      mockPrisma.$transaction.mockImplementation(async (cb: Function) => {
+      mockPrisma.$transaction.mockImplementation(async (cb: (...args: unknown[]) => unknown) => {
         mockTx.withdrawal.findUnique.mockResolvedValue({
           id: 'wd-1', userId: 'user-1', status: 'PENDING', amount: 25.0, method: 'PAYPAL',
         });
@@ -173,7 +173,7 @@ describe('WalletService', () => {
 
   describe('rejectWithdrawal', () => {
     it('should reject and refund', async () => {
-      mockPrisma.$transaction.mockImplementation(async (cb: Function) => {
+      mockPrisma.$transaction.mockImplementation(async (cb: (...args: unknown[]) => unknown) => {
         mockTx.withdrawal.findUnique.mockResolvedValue({
           id: 'wd-1', userId: 'user-1', status: 'PENDING', amount: 25.0,
         });

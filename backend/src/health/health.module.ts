@@ -7,4 +7,5 @@ import { HealthController } from './health.controller';
   controllers: [HealthController],
   exports: [HealthService],
 })
+// eslint-disable-next-line @typescript-eslint/no-extraneous-class
 export class HealthModule {}

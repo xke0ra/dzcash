@@ -7,4 +7,5 @@ import { MetricsController } from './metrics.controller';
   controllers: [MetricsController],
   exports: [MetricsService],
 })
+// eslint-disable-next-line @typescript-eslint/no-extraneous-class
 export class MetricsModule {}

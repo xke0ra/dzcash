@@ -54,4 +54,5 @@ import { CommonModule } from './common/common.module';
     },
   ],
 })
+// eslint-disable-next-line @typescript-eslint/no-extraneous-class
 export class AppModule {}

@@ -410,7 +410,7 @@ export default function AdminOffersPage() {
               {isLoading ? (
                 <tr><td colSpan={8} className="p-12 text-center text-slate-500">Loading...</td></tr>
               ) : offers.length === 0 ? (
-                <tr><td colSpan={8} className="p-12 text-center text-slate-500">No offers found. Click "Sync All" or "Add Offer".</td></tr>
+                <tr><td colSpan={8} className="p-12 text-center text-slate-500">No offers found. Click &ldquo;Sync All&rdquo; or &ldquo;Add Offer&rdquo;.</td></tr>
               ) : offers.map((o) => {
                 const clicks = o._count?.clicks || 0;
                 const conv = 0;

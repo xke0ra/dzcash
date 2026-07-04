@@ -53,4 +53,5 @@ const ALL_PROVIDERS = [
     ...ALL_PROVIDERS,
   ],
 })
+// eslint-disable-next-line @typescript-eslint/no-extraneous-class
 export class OffersModule {}

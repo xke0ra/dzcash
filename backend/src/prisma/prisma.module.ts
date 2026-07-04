@@ -6,4 +6,5 @@ import { PrismaService } from './prisma.service';
   providers: [PrismaService],
   exports: [PrismaService],
 })
+// eslint-disable-next-line @typescript-eslint/no-extraneous-class
 export class PrismaModule {}

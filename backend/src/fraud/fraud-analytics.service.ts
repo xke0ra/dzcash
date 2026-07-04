@@ -216,7 +216,7 @@ export class FraudAnalyticsService {
     });
     if (resolved.length === 0) return 0;
     const totalMinutes = resolved.reduce((sum, r) => {
-      return sum + (r.resolvedAt!.getTime() - r.createdAt.getTime()) / 60000;
+      return sum + ((r.resolvedAt as Date).getTime() - r.createdAt.getTime()) / 60000;
     }, 0);
     return Math.round(totalMinutes / resolved.length);
   }

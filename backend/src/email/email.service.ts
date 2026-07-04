@@ -57,7 +57,7 @@ export class EmailService {
 
     const body = await this.loadTemplate(name);
     const bodyHtml = body({ ...vars, year: new Date().getFullYear() });
-    return this.layoutTemplate!({ body: bodyHtml, year: new Date().getFullYear() });
+    return (this.layoutTemplate as HandlebarsTemplate)({ body: bodyHtml, year: new Date().getFullYear() });
   }
 
   private async getTransporter() {

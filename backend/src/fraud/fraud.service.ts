@@ -276,7 +276,7 @@ export class FraudService {
     const postbackCountry = await this.getGeoCountry(postbackIp);
 
     let isDifferent = false;
-    let details: any = { clickIp: click.ip, postbackIp };
+    const details: any = { clickIp: click.ip, postbackIp };
 
     if (clickCountry && postbackCountry) {
       isDifferent = clickCountry !== postbackCountry;

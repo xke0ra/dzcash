@@ -7,4 +7,5 @@ import { GamificationController } from './gamification.controller';
   controllers: [GamificationController],
   exports: [GamificationService],
 })
+// eslint-disable-next-line @typescript-eslint/no-extraneous-class
 export class GamificationModule {}

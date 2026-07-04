@@ -12,4 +12,5 @@ import { GamificationModule } from '../gamification/gamification.module';
   controllers: [TrackingController],
   exports: [TrackingService],
 })
+// eslint-disable-next-line @typescript-eslint/no-extraneous-class
 export class TrackingModule {}

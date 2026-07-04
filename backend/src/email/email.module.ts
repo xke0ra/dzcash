@@ -5,4 +5,5 @@ import { EmailService } from './email.service';
   providers: [EmailService],
   exports: [EmailService],
 })
+// eslint-disable-next-line @typescript-eslint/no-extraneous-class
 export class EmailModule {}

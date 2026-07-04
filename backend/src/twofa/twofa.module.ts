@@ -7,4 +7,5 @@ import { TwofaController } from './twofa.controller';
   providers: [TwofaService],
   exports: [TwofaService],
 })
+// eslint-disable-next-line @typescript-eslint/no-extraneous-class
 export class TwofaModule {}

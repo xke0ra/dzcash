@@ -11,4 +11,5 @@ import { EmailModule } from '../email/email.module';
   controllers: [NotificationController, PushController],
   exports: [NotificationService, PushService],
 })
+// eslint-disable-next-line @typescript-eslint/no-extraneous-class
 export class NotificationModule {}

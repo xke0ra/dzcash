@@ -65,7 +65,7 @@ describe('AuthService', () => {
 
     it('should register a new user successfully', async () => {
       mockPrisma.user.findUnique.mockResolvedValue(null); // no existing user
-      mockPrisma.$transaction.mockImplementation(async (cb: Function) => {
+      mockPrisma.$transaction.mockImplementation(async (cb: (...args: unknown[]) => unknown) => {
         const mockTx = {
           user: {
             create: jest.fn().mockResolvedValue({

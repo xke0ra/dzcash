@@ -13,6 +13,7 @@ import { AdminGuard } from './guards/admin.guard';
   controllers: [AdminController],
   exports: [AdminService, AdminGuard],
 })
+// eslint-disable-next-line @typescript-eslint/no-extraneous-class
 export class AdminModule {}
 
 export { AdminGuard };

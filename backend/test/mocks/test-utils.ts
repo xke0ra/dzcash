@@ -2,6 +2,7 @@ import { PrismaClient } from '@prisma/client';
 import { execSync } from 'child_process';
 import { join } from 'path';
 import { randomUUID } from 'crypto';
+import jwt from 'jsonwebtoken';
 
 const testDatabaseUrl = process.env.TEST_DATABASE_URL || 'postgresql://dzcash:dzcash@localhost:5433/dzcash_test';
 
@@ -67,7 +68,7 @@ export class TestPrismaService extends PrismaClient {
 
 export function getTestJwtToken(userId: string, email: string, role = 'USER') {
   // Use the same secret as in production
-  const jwt = require('jsonwebtoken');
+
   return jwt.sign(
     { sub: userId, email, role },
     process.env.JWT_SECRET || 'super-secret-jwt-key-change-this-in-production',
